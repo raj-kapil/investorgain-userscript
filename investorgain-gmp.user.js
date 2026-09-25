@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         InvestorGain IPO GMP - Est. Profit Column
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Adds Est. Profit and Total Price columns; removes Rating, IPO Size, Updated ON, Anchor, Lot, Price columns; renames BOA DT to Allotment
+// @version      1.3
+// @description  Adds Total Price and Est. Profit columns to right of GMP; removes Rating, IPO Size, Updated ON, Anchor, Lot, Price; renames BOA DT to Allotment
 // @author       You
-// @license MIT 
+// @license MIT
 // @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/investorgain-gmp.user.js
 // @downloadURL  https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/investorgain-gmp.user.js
 // @match        https://www.investorgain.com/*
@@ -19,28 +19,26 @@
     const CLASS_CELL_PROFIT = '__tm_profit_c__';
     const CLASS_HEAD_TOTAL  = '__tm_total_h__';
     const CLASS_CELL_TOTAL  = '__tm_total_c__';
+    const CLASS_HIDE        = '__tm_hide__';
+    const STYLE_ID          = '__tm_style__';
 
-    // Columns to remove (lowercase, partial match)
-    const REMOVE_COLUMNS = [
-        'rating',
-        'ipo size',
-        'updated on',
-        'anchor',
-        'lot',
-        'price'
-    ];
-
-    // Column renames: { match: 'new name' }
-    const RENAME_COLUMNS = {
-        'boa dt': 'Allotment'
-    };
+    const REMOVE_COLUMNS = ['rating', 'ipo size', 'updated on', 'anchor', 'lot', 'price'];
+    const RENAME_COLUMNS = { 'boa dt': 'Allotment' };
 
     function getNum(s) {
         const m = String(s).match(/\d+(?:\.\d+)?/);
         return m ? parseFloat(m[0]) : NaN;
     }
 
-    function removeColumns(table) {
+    function injectStyle() {
+        if (document.getElementById(STYLE_ID)) return;
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = `.__tm_hide__ { display: none !important; }`;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    function hideColumnsByClass(table) {
         const rows = Array.from(table.querySelectorAll('tr'));
         if (rows.length < 2) return;
 
@@ -49,6 +47,7 @@
 
         const removeIndices = [];
         hCells.forEach((c, i) => {
+            if (c.classList.contains(CLASS_HEAD_PROFIT) || c.classList.contains(CLASS_HEAD_TOTAL)) return;
             const t = c.textContent.trim().toLowerCase();
             if (REMOVE_COLUMNS.some(col => t.includes(col))) {
                 removeIndices.push(i);
@@ -57,11 +56,10 @@
 
         if (removeIndices.length === 0) return;
 
-        const sorted = [...removeIndices].sort((a, b) => b - a);
         rows.forEach(row => {
             const cells = Array.from(row.children);
-            sorted.forEach(idx => {
-                if (cells[idx]) cells[idx].style.display = 'none';
+            removeIndices.forEach(idx => {
+                if (cells[idx]) cells[idx].classList.add(CLASS_HIDE);
             });
         });
     }
@@ -71,14 +69,13 @@
         if (!hRow) return;
 
         Array.from(hRow.children).forEach(cell => {
+            if (cell.classList.contains(CLASS_HEAD_PROFIT) || cell.classList.contains(CLASS_HEAD_TOTAL)) return;
             const t = cell.textContent.trim().toLowerCase();
             for (const [match, newName] of Object.entries(RENAME_COLUMNS)) {
                 if (t.includes(match)) {
-                    // Preserve inner HTML structure if present, else just set text
                     if (cell.children.length === 0) {
                         cell.textContent = newName;
                     } else {
-                        // Update only text nodes to preserve any nested elements
                         let updated = false;
                         cell.childNodes.forEach(node => {
                             if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
@@ -98,10 +95,7 @@
         const table = document.querySelector('table');
         if (!table) return false;
 
-        // 1. Remove unwanted columns
-        removeColumns(table);
-
-        // 2. Rename columns (BOA DT -> Allotment)
+        hideColumnsByClass(table);
         renameColumns(table);
 
         const rows = Array.from(table.querySelectorAll('tr'));
@@ -110,82 +104,74 @@
         const hRow = rows[0];
         const hCells = Array.from(hRow.children);
 
-        // Find header indices
-        let gi = -1, li = -1, pi = -1, ni = -1;
+        // Find ORIGINAL header indices (skip our injected headers)
+        let gi = -1, li = -1, pi = -1;
         hCells.forEach((c, i) => {
+            if (c.classList.contains(CLASS_HEAD_PROFIT) || c.classList.contains(CLASS_HEAD_TOTAL)) return;
             const t = c.textContent.trim().toLowerCase();
             if (gi < 0 && t.includes('gmp'))  gi = i;
             if (li < 0 && t.includes('lot'))  li = i;
             if (pi < 0 && t.includes('price') && !t.includes('total')) pi = i;
-            if (ni < 0 && t.includes('name')) ni = i;
         });
 
-        // Need Name + Price + Lot to compute Total Price, GMP + Lot for Est. Profit
-        if (ni < 0 || pi < 0 || li < 0 || gi < 0) return false;
+        if (gi < 0 || li < 0 || pi < 0) return false;
 
-        // ---- Add "Total Price" column right after Name ----
+        const gmpHeader = hCells[gi];
+
+        // ---- Total Price header: RIGHT of GMP (no custom style) ----
         let hTotal = hRow.querySelector('.' + CLASS_HEAD_TOTAL);
         if (!hTotal) {
-            const ref = hRow.children[ni];
-            if (!ref) return false;
-
             hTotal = document.createElement('th');
             hTotal.className = CLASS_HEAD_TOTAL;
-            hTotal.style.cssText = 'color: #2563eb; font-weight: bold; padding: 10px; text-align: center; border: 1px solid #ddd;';
-            ref.parentNode.insertBefore(hTotal, ref.nextSibling);
+            // Inherit table's native header styling — no inline styles
+            gmpHeader.after(hTotal);
         }
         hTotal.textContent = 'Total Price';
 
-        // ---- Add "Est. Profit" column right after GMP ----
+        // ---- Est. Profit header: RIGHT of Total Price (no custom style) ----
         let hProfit = hRow.querySelector('.' + CLASS_HEAD_PROFIT);
         if (!hProfit) {
-            const ref = hRow.children[gi];
-            if (!ref) return false;
-
             hProfit = document.createElement('th');
             hProfit.className = CLASS_HEAD_PROFIT;
-            hProfit.style.cssText = 'color: #16a34a; font-weight: bold; padding: 10px; text-align: center; border: 1px solid #ddd;';
-            ref.parentNode.insertBefore(hProfit, ref.nextSibling);
+            // Inherit table's native header styling — no inline styles
+            hTotal.after(hProfit);
         }
         hProfit.textContent = 'Est. Profit';
 
-        // ---- Fill data cells ----
+        // ---- Data cells ----
         for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             const cells = Array.from(row.children);
 
-            if (cells.length <= Math.max(gi, li, pi, ni)) continue;
+            if (cells.length <= Math.max(gi, li, pi)) continue;
 
             const gCell = cells[gi];
             const lCell = cells[li];
             const pCell = cells[pi];
-            const nCell = cells[ni];
 
-            if (!gCell || !lCell || !pCell || !nCell) continue;
+            if (!gCell || !lCell || !pCell) continue;
 
             const g = getNum(gCell.textContent);
             const l = getNum(lCell.textContent);
             const p = getNum(pCell.textContent);
 
-            // ---- Total Price cell (right of Name) ----
+            // Total Price cell → right of GMP (no custom style)
             let tCell = row.querySelector('.' + CLASS_CELL_TOTAL);
             if (!tCell) {
                 tCell = document.createElement('td');
                 tCell.className = CLASS_CELL_TOTAL;
-                tCell.style.cssText = 'color: #2563eb; font-weight: 600; padding: 10px; text-align: center; border: 1px solid #ddd; white-space: nowrap;';
-                nCell.parentNode.insertBefore(tCell, nCell.nextSibling);
+                gCell.after(tCell);
             }
             tCell.textContent = (!isNaN(p) && !isNaN(l))
                 ? '₹' + Math.round(p * l).toLocaleString('en-IN')
                 : '-';
 
-            // ---- Est. Profit cell (right of GMP) ----
+            // Est. Profit cell → right of Total Price (no custom style)
             let eCell = row.querySelector('.' + CLASS_CELL_PROFIT);
             if (!eCell) {
                 eCell = document.createElement('td');
                 eCell.className = CLASS_CELL_PROFIT;
-                eCell.style.cssText = 'color: #16a34a; font-weight: 600; padding: 10px; text-align: center; border: 1px solid #ddd; white-space: nowrap;';
-                gCell.parentNode.insertBefore(eCell, gCell.nextSibling);
+                tCell.after(eCell);
             }
             eCell.textContent = (!isNaN(g) && !isNaN(l) && g > 0)
                 ? '₹' + Math.round(g * l).toLocaleString('en-IN')
@@ -195,25 +181,23 @@
         return true;
     }
 
-    // Initial run
+    injectStyle();
     addColumns();
-
-    // Retry loop (React takes time to hydrate)
     for (let i = 0; i < 15; i++) {
         setTimeout(addColumns, 300 + i * 200);
     }
 
-    // Observe only the table
+    const headObserver = new MutationObserver(() => {
+        if (!document.getElementById(STYLE_ID)) injectStyle();
+    });
+    headObserver.observe(document.documentElement, { childList: true, subtree: true });
+
     const table = document.querySelector('table');
     if (table) {
         const observer = new MutationObserver(() => {
             clearTimeout(observer.debounceTimer);
             observer.debounceTimer = setTimeout(addColumns, 100);
         });
-
-        observer.observe(table, {
-            childList: true,
-            subtree: true
-        });
+        observer.observe(table, { childList: true, subtree: true });
     }
 })();
