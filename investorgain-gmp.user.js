@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         InvestorGain IPO GMP - Est. Profit Column
 // @namespace    http://tampermonkey.net/
-// @version      5.1
+// @version      1.0
 // @description  Adds Est. Profit column after GMP
 // @author       You
 // @license MIT 
-// @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/.user.js
-// @downloadURL  https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/.user.js
+// @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/investorgain-gmp.user.js
+// @downloadURL  https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/investorgain-gmp.user.js
 // @match        https://www.investorgain.com/*
 // @grant        none
 // @run-at       document-start
