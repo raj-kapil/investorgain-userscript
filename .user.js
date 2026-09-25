@@ -5,8 +5,8 @@
 // @description  Adds Est. Profit column after GMP
 // @author       You
 // @license MIT 
-// @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/override_gmp.js
-// @downloadURL  https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/override_gmp.js
+// @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/.user.js
+// @downloadURL  https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/.user.js
 // @match        https://www.investorgain.com/*
 // @grant        none
 // @run-at       document-start
