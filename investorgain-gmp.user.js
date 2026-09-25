@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         InvestorGain IPO GMP - Est. Profit Column
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Adds Total Price and Est. Profit columns to right of GMP; removes Rating, IPO Size, Updated ON, Anchor, Lot, Price; renames BOA DT to Allotment
+// @version      1.4
+// @description  Adds Total Price and Est. Profit columns to right of GMP; removes Rating, IPO Size, Updated ON, Anchor, Lot, Price
 // @author       You
 // @license MIT
 // @updateURL    https://raw.githubusercontent.com/raj-kapil/investorgain-userscript/main/investorgain-gmp.user.js
@@ -23,7 +23,6 @@
     const STYLE_ID          = '__tm_style__';
 
     const REMOVE_COLUMNS = ['rating', 'ipo size', 'updated on', 'anchor', 'lot', 'price'];
-    const RENAME_COLUMNS = { 'boa dt': 'Allotment' };
 
     function getNum(s) {
         const m = String(s).match(/\d+(?:\.\d+)?/);
@@ -64,39 +63,11 @@
         });
     }
 
-    function renameColumns(table) {
-        const hRow = table.querySelector('tr');
-        if (!hRow) return;
-
-        Array.from(hRow.children).forEach(cell => {
-            if (cell.classList.contains(CLASS_HEAD_PROFIT) || cell.classList.contains(CLASS_HEAD_TOTAL)) return;
-            const t = cell.textContent.trim().toLowerCase();
-            for (const [match, newName] of Object.entries(RENAME_COLUMNS)) {
-                if (t.includes(match)) {
-                    if (cell.children.length === 0) {
-                        cell.textContent = newName;
-                    } else {
-                        let updated = false;
-                        cell.childNodes.forEach(node => {
-                            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                                node.textContent = newName;
-                                updated = true;
-                            }
-                        });
-                        if (!updated) cell.textContent = newName;
-                    }
-                    break;
-                }
-            }
-        });
-    }
-
     function addColumns() {
         const table = document.querySelector('table');
         if (!table) return false;
 
         hideColumnsByClass(table);
-        renameColumns(table);
 
         const rows = Array.from(table.querySelectorAll('tr'));
         if (rows.length < 2) return false;
@@ -118,22 +89,20 @@
 
         const gmpHeader = hCells[gi];
 
-        // ---- Total Price header: RIGHT of GMP (no custom style) ----
+        // ---- Total Price header: RIGHT of GMP ----
         let hTotal = hRow.querySelector('.' + CLASS_HEAD_TOTAL);
         if (!hTotal) {
             hTotal = document.createElement('th');
             hTotal.className = CLASS_HEAD_TOTAL;
-            // Inherit table's native header styling — no inline styles
             gmpHeader.after(hTotal);
         }
         hTotal.textContent = 'Total Price';
 
-        // ---- Est. Profit header: RIGHT of Total Price (no custom style) ----
+        // ---- Est. Profit header: RIGHT of Total Price ----
         let hProfit = hRow.querySelector('.' + CLASS_HEAD_PROFIT);
         if (!hProfit) {
             hProfit = document.createElement('th');
             hProfit.className = CLASS_HEAD_PROFIT;
-            // Inherit table's native header styling — no inline styles
             hTotal.after(hProfit);
         }
         hProfit.textContent = 'Est. Profit';
@@ -155,7 +124,7 @@
             const l = getNum(lCell.textContent);
             const p = getNum(pCell.textContent);
 
-            // Total Price cell → right of GMP (no custom style)
+            // Total Price cell → right of GMP
             let tCell = row.querySelector('.' + CLASS_CELL_TOTAL);
             if (!tCell) {
                 tCell = document.createElement('td');
@@ -166,7 +135,7 @@
                 ? '₹' + Math.round(p * l).toLocaleString('en-IN')
                 : '-';
 
-            // Est. Profit cell → right of Total Price (no custom style)
+            // Est. Profit cell → right of Total Price
             let eCell = row.querySelector('.' + CLASS_CELL_PROFIT);
             if (!eCell) {
                 eCell = document.createElement('td');
